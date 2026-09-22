@@ -257,6 +257,8 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
   <string>volumeHUD</string>
   <key>CFBundleDisplayName</key>
   <string>volumeHUD</string>
+  <key>CFBundleIconFile</key>
+  <string>volumeHUD</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
