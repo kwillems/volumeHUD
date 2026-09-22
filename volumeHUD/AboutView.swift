@@ -5,6 +5,7 @@
 //  https://github.com/dannystewart/volumeHUD
 //
 
+import Combine
 import SwiftUI
 
 // MARK: - AboutView
@@ -15,6 +16,7 @@ struct AboutView: View {
     // Settings for app preferences
     #if !SANDBOX
         @AppStorage("brightnessEnabled") private var brightnessEnabled: Bool = false
+    @StateObject private var trueToneController = TrueToneController()
     #endif // !SANDBOX
     @AppStorage("volumeHUDFollowsMouse") private var volumeHUDFollowsMouse: Bool = true
     @AppStorage("useRelativePositioning") private var useRelativePositioning: Bool = true
@@ -177,7 +179,64 @@ struct AboutView: View {
                     }
                     .padding(.leading, settingPadding)
                     .animation(.easeInOut(duration: 0.3), value: brightnessEnabled)
-                #endif // !SANDBOX
+                
+        // MARK: - True Tone Toggle
+        VStack(alignment: .leading, spacing: spaceBeforeSubtitle) {
+            HStack(alignment: .center, spacing: iconColumnWidth) {
+                Image(systemName: "circle.lefthalf.filled")
+                    .foregroundStyle(
+                        trueToneController.isEnabled && trueToneController.isAvailable
+                            ? .primary
+                            : .secondary
+                    )
+                    .font(.system(size: 14))
+                    .frame(width: 14, alignment: .leading)
+
+                Text("True Tone")
+                    .font(.system(size: 12, weight: .medium))
+                    .frame(width: minSettingColumnWidth, alignment: .leading)
+
+                Spacer()
+
+                Toggle(
+                    "",
+                    isOn: Binding(
+                        get: { trueToneController.isEnabled },
+                        set: { newValue in
+                            _ = trueToneController.setEnabled(newValue)
+                        }
+                    )
+                )
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .disabled(!trueToneController.isAvailable)
+                .offset(x: 12)
+            }
+
+            HStack(spacing: iconColumnWidth) {
+                Spacer()
+                    .frame(width: 14)
+
+                Text(
+                    trueToneController.isAvailable
+                        ? "Pas de kleurtemperatuur automatisch aan het omgevingslicht aan."
+                        : "True Tone is momenteel niet beschikbaar."
+                )
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+                .opacity(0.8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(.leading, settingPadding)
+        .onReceive(
+            Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
+        ) { _ in
+            trueToneController.refresh()
+        }
+
+        #endif // !SANDBOX
 
                 // MARK: - Display Toggle for HUD Placement
 
@@ -260,9 +319,10 @@ struct AboutView: View {
             .padding(.trailing, 6) // Right side window padding
         }
         .padding(32) // Overall frame padding
-        .frame(width: 540, height: 300)
+        .frame(width: 540, height: 350)
         #if !SANDBOX
             .onAppear {
+            trueToneController.refresh()
                 Task {
                     try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 second delay
                     checkForUpdates()

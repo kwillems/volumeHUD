@@ -184,26 +184,63 @@ class BrightnessMonitor: ObservableObject, @unchecked Sendable {
 
         logger.info("DisplayServices framework loaded successfully!")
     }
+    /// Returns the preferred display for brightness control.
+    ///
+    /// Do not rely on DisplayServicesCanChangeBrightness for external Apple displays.
+    /// Some Studio Display/macOS combinations can still be read/written correctly.
+    private func getBrightnessDisplayID() -> CGDirectDisplayID? {
+        guard let getBrightness = getBrightnessFunc else {
+            return nil
+        }
 
-    /// Returns the CGDirectDisplayID for the built-in display, if present
-    private func getBuiltinDisplayID() -> CGDirectDisplayID? {
         var displayCount: UInt32 = 0
-        var result = CGGetActiveDisplayList(0, nil, &displayCount)
-        if result != .success || displayCount == 0 {
+        guard CGGetActiveDisplayList(0, nil, &displayCount) == .success, displayCount > 0 else {
             return nil
         }
 
         var activeDisplays = [CGDirectDisplayID](repeating: 0, count: Int(displayCount))
-        result = CGGetActiveDisplayList(displayCount, &activeDisplays, &displayCount)
-        if result != .success {
+        guard CGGetActiveDisplayList(displayCount, &activeDisplays, &displayCount) == .success else {
             return nil
         }
 
-        for display in activeDisplays.prefix(Int(displayCount)) where CGDisplayIsBuiltin(display) != 0 {
-            return display
+        let displays = Array(activeDisplays.prefix(Int(displayCount)))
+
+        func canReadBrightness(_ display: CGDirectDisplayID) -> Bool {
+            var brightness: Float = 0.0
+            return getBrightness(display, &brightness) == KERN_SUCCESS
         }
 
-        return nil
+        let readableDisplays = displays.filter(canReadBrightness)
+        let mainDisplay = CGMainDisplayID()
+
+        // First choice: external Apple display (Studio Display / Pro Display XDR).
+        // Apple's display vendor ID is 0x0610.
+        if let appleExternal = readableDisplays.first(where: {
+            CGDisplayIsBuiltin($0) == 0 && CGDisplayVendorNumber($0) == 0x0610
+        }) {
+            return appleExternal
+        }
+
+        // Next: readable external main display.
+        if let primaryExternal = readableDisplays.first(where: {
+            $0 == mainDisplay && CGDisplayIsBuiltin($0) == 0
+        }) {
+            return primaryExternal
+        }
+
+        // Then any readable external display.
+        if let external = readableDisplays.first(where: {
+            CGDisplayIsBuiltin($0) == 0
+        }) {
+            return external
+        }
+
+        // Finally preserve built-in behaviour.
+        if let primary = readableDisplays.first(where: { $0 == mainDisplay }) {
+            return primary
+        }
+
+        return readableDisplays.first
     }
 
     private func updateBrightnessOnStartup() {
@@ -222,34 +259,23 @@ class BrightnessMonitor: ObservableObject, @unchecked Sendable {
             }
         }
     }
-
     private func getCurrentBrightness() -> Float? {
-        // Use cached DisplayServices function pointers
-        guard
-            let canChangeBrightness = canChangeBrightnessFunc,
-            let getBrightness = getBrightnessFunc else
-        {
+        // Use cached DisplayServices function pointers.
+        guard let getBrightness = getBrightnessFunc else {
             logger.error("getCurrentBrightness: Function pointers not available.")
             return nil
         }
 
-        // Always target the built-in display rather than the current main display
-        guard let builtinDisplay = getBuiltinDisplayID() else {
+        guard let targetDisplay = getBrightnessDisplayID() else {
             if !hasLoggedNoDisplayDetected {
-                logger.warning("getCurrentBrightness: No built-in display detected.")
+                logger.warning("getCurrentBrightness: No DisplayServices-capable display detected.")
                 hasLoggedNoDisplayDetected = true
             }
             return nil
         }
 
-        let canChange = canChangeBrightness(builtinDisplay)
-        guard canChange else {
-            logger.warning("getCurrentBrightness: Built-in display cannot change brightness (id: \(builtinDisplay))")
-            return nil
-        }
-
         var brightness: Float = 0.0
-        let result = getBrightness(builtinDisplay, &brightness)
+        let result = getBrightness(targetDisplay, &brightness)
         if result == KERN_SUCCESS {
             return brightness
         }

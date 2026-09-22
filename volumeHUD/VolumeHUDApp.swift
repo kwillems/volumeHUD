@@ -31,6 +31,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, @preconcurrency UNUserNotifi
     #endif // !SANDBOX
     var hudController: HUDController!
     var aboutWindow: NSPanel?
+    private var statusItem: NSStatusItem?
     var loginItemManager: LoginItemManager!
 
     let logger: Logger = .init()
@@ -81,6 +82,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, @preconcurrency UNUserNotifi
 
         // Keep the app headless and out of the Dock
         NSApplication.shared.setActivationPolicy(.accessory)
+        setupMenuBarItem()
 
         // Set up the notifications delegate BEFORE scheduling any notifications
         UNUserNotificationCenter.current().delegate = self
@@ -307,6 +309,46 @@ class AppDelegate: NSObject, NSApplicationDelegate, @preconcurrency UNUserNotifi
         }
 
         onDismiss?()
+    }
+
+
+    // MARK: - Menu Bar
+
+    /// Add a persistent volumeHUD icon to the macOS menu bar.
+    /// A normal left-click opens the existing About/settings window.
+    private func setupMenuBarItem() {
+        guard statusItem == nil else { return }
+
+        let item = NSStatusBar.system.statusItem(withLength: 48)
+
+        if let button = item.button {
+            if let iconURL = Bundle.main.url(forResource: "MenuBarIcon", withExtension: "svg"),
+               let image = NSImage(contentsOf: iconURL) {
+                image.isTemplate = true
+                image.size = NSSize(width: 44, height: 22)
+                button.image = image
+                button.imageScaling = .scaleProportionallyDown
+            } else {
+                let image = NSImage(
+                    systemSymbolName: "speaker.wave.2.fill",
+                    accessibilityDescription: "volumeHUD"
+                )
+                image?.isTemplate = true
+                button.image = image
+            }
+
+            button.toolTip = "volumeHUD"
+            button.target = self
+            button.action = #selector(menuBarItemClicked(_:))
+            button.sendAction(on: [.leftMouseUp])
+        }
+
+        statusItem = item
+    }
+
+    @objc
+    private func menuBarItemClicked(_: Any?) {
+        showAboutWindow()
     }
 
     // MARK: - Show About Window

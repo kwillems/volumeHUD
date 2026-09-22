@@ -114,25 +114,29 @@ class HUDController: ObservableObject {
 
         let windowSize = NSSize(width: 200, height: 200)
 
-        // Brightness HUD always shows on built-in display (since that's what it controls). Volume
+        // Brightness HUD follows the preferred brightness display. Volume
         // HUD respects user preference for display location.
         let targetScreen: NSScreen
         let selectionReason: String
         #if !SANDBOX
+            let followMouse = UserDefaults.standard.bool(forKey: "volumeHUDFollowsMouse")
+
             if hudType == .brightness {
-                if let builtin = getBuiltinScreen() {
-                    targetScreen = builtin
-                    selectionReason = "brightness builtin"
+                if followMouse, let mouse = getScreenWithMouse() {
+                    targetScreen = mouse
+                    selectionReason = "brightness followsMouse"
+                } else if let brightnessScreen = getPreferredBrightnessScreen() {
+                    targetScreen = brightnessScreen
+                    selectionReason = "brightness preferred display"
                 } else if let main = NSScreen.main {
                     targetScreen = main
-                    selectionReason = "brightness builtin-missing fallback NSScreen.main"
+                    selectionReason = "brightness preferred-display-missing fallback NSScreen.main"
                 } else {
                     targetScreen = NSScreen.screens.first!
-                    selectionReason = "brightness builtin-missing fallback firstScreen"
+                    selectionReason = "brightness preferred-display-missing fallback firstScreen"
                 }
             } else {
-                // Check user preference for volume HUD location
-                let followMouse = UserDefaults.standard.bool(forKey: "volumeHUDFollowsMouse")
+                // Check user preference for HUD location
                 if followMouse {
                     if let mouse = getScreenWithMouse() {
                         targetScreen = mouse
@@ -238,6 +242,40 @@ class HUDController: ObservableObject {
         }
         return nil
     }
+    /// Chooses the screen on which the brightness HUD should appear.
+    /// Prefer Apple Studio Display, then the primary external display, then any external display,
+    /// and finally the built-in panel.
+    private func getPreferredBrightnessScreen() -> NSScreen? {
+        if let studioDisplay = NSScreen.screens.first(where: {
+            $0.localizedName.localizedCaseInsensitiveContains("Studio Display")
+        }) {
+            return studioDisplay
+        }
+
+        let mainDisplayID = CGMainDisplayID()
+
+        if let primaryExternal = NSScreen.screens.first(where: { screen in
+            guard let screenNumber = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else {
+                return false
+            }
+            let displayID = CGDirectDisplayID(screenNumber.uint32Value)
+            return displayID == mainDisplayID && CGDisplayIsBuiltin(displayID) == 0
+        }) {
+            return primaryExternal
+        }
+
+        if let external = NSScreen.screens.first(where: { screen in
+            guard let screenNumber = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else {
+                return false
+            }
+            return CGDisplayIsBuiltin(CGDirectDisplayID(screenNumber.uint32Value)) == 0
+        }) {
+            return external
+        }
+
+        return getBuiltinScreen()
+    }
+
 
     /// Returns the NSScreen corresponding to macOS's primary (menu bar) display, if present.
     private func getPrimaryScreen() -> NSScreen? {

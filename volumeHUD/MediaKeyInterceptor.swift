@@ -40,7 +40,7 @@ final class MediaKeyInterceptor {
     /// How long to suppress VolumeMonitor HUD updates after an intercepted change
     nonisolated static let volumeChangeCooldown: TimeInterval = 0.2
 
-    /// Static callback for CGEvent tap. Bridges to instance method.
+    /// Static callback for the HID-level CGEvent tap. Bridges to instance method.
     private static let eventTapCallback: CGEventTapCallBack = { _, type, cgEvent, userInfo in
         guard let userInfo else {
             return Unmanaged.passRetained(cgEvent)
@@ -48,21 +48,82 @@ final class MediaKeyInterceptor {
 
         let interceptor = Unmanaged<MediaKeyInterceptor>.fromOpaque(userInfo).takeUnretainedValue()
 
-        // Handle tap disabled events
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-            // Re-enable the tap
             if let tap = interceptor.eventTap {
+                CGEvent.tapEnable(tap: tap, enable: true)
+            }
+            if let tap = interceptor.sessionEventTap {
                 CGEvent.tapEnable(tap: tap, enable: true)
             }
             return Unmanaged.passRetained(cgEvent)
         }
 
-        // Only handle system-defined events
         guard type.rawValue == 14 else {
             return Unmanaged.passRetained(cgEvent)
         }
 
-        // Process the event and determine if we should consume it
+        return interceptor.handleEvent(cgEvent)
+    }
+
+
+    /// Annotated-session callback used for synthetic media-key events.
+    ///
+    /// Stream Deck media actions can arrive too late in the event pipeline for
+    /// the HID tap. This callback handles brightness, volume and mute.
+    /// Duplicate synthetic key-downs emitted within 50 ms are consumed once.
+    private static let sessionEventTapCallback: CGEventTapCallBack = { _, type, cgEvent, userInfo in
+        guard let userInfo else {
+            return Unmanaged.passRetained(cgEvent)
+        }
+
+        let interceptor = Unmanaged<MediaKeyInterceptor>.fromOpaque(userInfo).takeUnretainedValue()
+
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            if let tap = interceptor.sessionEventTap {
+                CGEvent.tapEnable(tap: tap, enable: true)
+            }
+            return Unmanaged.passRetained(cgEvent)
+        }
+
+        guard type.rawValue == 14,
+              let nsEvent = NSEvent(cgEvent: cgEvent),
+              nsEvent.type == .systemDefined,
+              nsEvent.subtype.rawValue == 8
+        else {
+            return Unmanaged.passRetained(cgEvent)
+        }
+
+        let data1 = nsEvent.data1
+        let keyCode = (data1 & 0xFFFF_0000) >> 16
+        let keyFlags = data1 & 0x0000_FFFF
+        let keyState = (keyFlags & 0xFF00) >> 8
+
+        // Only handle media-key down events that volumeHUD understands.
+        guard keyState == 0x0A,
+              NXKeyType(rawValue: keyCode) != nil
+        else {
+            return Unmanaged.passRetained(cgEvent)
+        }
+
+        let now = ProcessInfo.processInfo.systemUptime
+        if interceptor.lastAnnotatedMediaKeyCode == keyCode,
+           now - interceptor.lastAnnotatedMediaKeyTime <
+               interceptor.annotatedMediaKeyDeduplicationWindow
+        {
+            interceptor.logger.debug(
+                "Ignoring duplicate annotated-session media event: keyCode=\(keyCode)"
+            )
+            // Consume the duplicate so macOS does not handle it either.
+            return nil
+        }
+
+        interceptor.lastAnnotatedMediaKeyCode = keyCode
+        interceptor.lastAnnotatedMediaKeyTime = now
+
+        interceptor.logger.debug(
+            "Annotated-session media event detected: keyCode=\(keyCode)"
+        )
+
         return interceptor.handleEvent(cgEvent)
     }
 
@@ -75,6 +136,15 @@ final class MediaKeyInterceptor {
 
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
+
+    // Annotated-session tap for synthetic media events (for example Stream Deck).
+    private var sessionEventTap: CFMachPort?
+    private var sessionRunLoopSource: CFRunLoopSource?
+
+    // Stream Deck can emit the same synthetic media-key down event twice.
+    private nonisolated(unsafe) var lastAnnotatedMediaKeyCode: Int?
+    private nonisolated(unsafe) var lastAnnotatedMediaKeyTime: TimeInterval = 0
+    private let annotatedMediaKeyDeduplicationWindow: TimeInterval = 0.05
     private var feedbackSoundData: Data?
     private var activeFeedbackPlayers: [AVAudioPlayer] = []
     private var isRunning = false
@@ -137,30 +207,25 @@ final class MediaKeyInterceptor {
             return true
         }
 
-        // Reset fallback states on start (allows re-testing each app launch)
+        // Reset fallback states on start (allows re-testing each app launch).
         volumeInterceptionWorking = true
         brightnessInterceptionWorking = true
         volumeControlState = nil
 
-        // Check accessibility permissions first
+        // Check accessibility permissions first.
         guard AXIsProcessTrusted() else {
             logger.warning("MediaKeyInterceptor: Accessibility permissions not granted. Cannot intercept media keys.")
             return false
         }
 
-        // Create the event tap We use kCGHIDEventTap to intercept at the lowest level and
-        // .defaultTap (not .listenOnly) so we can consume events
         let systemDefinedMask: CGEventMask = 1 << 14 // NX_SYSDEFINED = 14
-
-        // We need to use a static callback that bridges to self Store self in a context that the
-        // callback can access
         let userInfo = Unmanaged.passUnretained(self).toOpaque()
 
         guard
             let tap = CGEvent.tapCreate(
                 tap: .cghidEventTap,
                 place: .headInsertEventTap,
-                options: .defaultTap, // Important: .defaultTap allows consuming events
+                options: .defaultTap,
                 eventsOfInterest: systemDefinedMask,
                 callback: MediaKeyInterceptor.eventTapCallback,
                 userInfo: userInfo,
@@ -178,9 +243,32 @@ final class MediaKeyInterceptor {
             CGEvent.tapEnable(tap: tap, enable: true)
             isRunning = true
 
-            // Start monitoring for device changes
-            startDeviceChangeMonitoring()
+            // A second active tap at annotated-session level catches synthetic
+            // NX_SYSDEFINED media events generated by software such as Stream Deck.
+            if let sessionTap = CGEvent.tapCreate(
+                tap: .cgAnnotatedSessionEventTap,
+                place: .headInsertEventTap,
+                options: .defaultTap,
+                eventsOfInterest: systemDefinedMask,
+                callback: MediaKeyInterceptor.sessionEventTapCallback,
+                userInfo: userInfo
+            ) {
+                sessionEventTap = sessionTap
+                sessionRunLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, sessionTap, 0)
 
+                if let sessionSource = sessionRunLoopSource {
+                    CFRunLoopAddSource(CFRunLoopGetMain(), sessionSource, .commonModes)
+                    CGEvent.tapEnable(tap: sessionTap, enable: true)
+                    logger.debug("Started annotated-session media-key interception.")
+                } else {
+                    logger.warning("MediaKeyInterceptor: Failed to create annotated-session event-tap run loop source.")
+                    sessionEventTap = nil
+                }
+            } else {
+                logger.warning("MediaKeyInterceptor: Failed to create annotated-session event tap; synthetic media keys may pass through.")
+            }
+
+            startDeviceChangeMonitoring()
             logger.debug("Started intercepting media keys.")
             return true
         } else {
@@ -189,12 +277,9 @@ final class MediaKeyInterceptor {
             return false
         }
     }
-
-    /// Stop intercepting media key events.
     func stop() {
         guard isRunning else { return }
 
-        // Stop device change monitoring
         stopDeviceChangeMonitoring()
 
         if let tap = eventTap {
@@ -205,11 +290,20 @@ final class MediaKeyInterceptor {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
         }
 
+        if let tap = sessionEventTap {
+            CGEvent.tapEnable(tap: tap, enable: false)
+        }
+
+        if let source = sessionRunLoopSource {
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
+        }
+
+        sessionRunLoopSource = nil
+        sessionEventTap = nil
         runLoopSource = nil
         eventTap = nil
         isRunning = false
 
-        // Close DisplayServices handle
         if let handle = displayServicesHandle {
             dlclose(handle)
             displayServicesHandle = nil
@@ -671,26 +765,63 @@ final class MediaKeyInterceptor {
 
         logger.info("MediaKeyInterceptor: DisplayServices framework loaded for brightness control.")
     }
+    /// Returns the preferred display for brightness control.
+    ///
+    /// Do not rely on DisplayServicesCanChangeBrightness for external Apple displays.
+    /// Some Studio Display/macOS combinations can still be read/written correctly.
+    private func getBrightnessDisplayID() -> CGDirectDisplayID? {
+        guard let getBrightness = getBrightnessFunc else {
+            return nil
+        }
 
-    /// Get the built-in display ID.
-    private func getBuiltinDisplayID() -> CGDirectDisplayID? {
         var displayCount: UInt32 = 0
-        var result = CGGetActiveDisplayList(0, nil, &displayCount)
-        if result != .success || displayCount == 0 {
+        guard CGGetActiveDisplayList(0, nil, &displayCount) == .success, displayCount > 0 else {
             return nil
         }
 
         var activeDisplays = [CGDirectDisplayID](repeating: 0, count: Int(displayCount))
-        result = CGGetActiveDisplayList(displayCount, &activeDisplays, &displayCount)
-        if result != .success {
+        guard CGGetActiveDisplayList(displayCount, &activeDisplays, &displayCount) == .success else {
             return nil
         }
 
-        for display in activeDisplays.prefix(Int(displayCount)) where CGDisplayIsBuiltin(display) != 0 {
-            return display
+        let displays = Array(activeDisplays.prefix(Int(displayCount)))
+
+        func canReadBrightness(_ display: CGDirectDisplayID) -> Bool {
+            var brightness: Float = 0.0
+            return getBrightness(display, &brightness) == KERN_SUCCESS
         }
 
-        return nil
+        let readableDisplays = displays.filter(canReadBrightness)
+        let mainDisplay = CGMainDisplayID()
+
+        // First choice: external Apple display (Studio Display / Pro Display XDR).
+        // Apple's display vendor ID is 0x0610.
+        if let appleExternal = readableDisplays.first(where: {
+            CGDisplayIsBuiltin($0) == 0 && CGDisplayVendorNumber($0) == 0x0610
+        }) {
+            return appleExternal
+        }
+
+        // Next: readable external main display.
+        if let primaryExternal = readableDisplays.first(where: {
+            $0 == mainDisplay && CGDisplayIsBuiltin($0) == 0
+        }) {
+            return primaryExternal
+        }
+
+        // Then any readable external display.
+        if let external = readableDisplays.first(where: {
+            CGDisplayIsBuiltin($0) == 0
+        }) {
+            return external
+        }
+
+        // Finally preserve built-in behaviour.
+        if let primary = readableDisplays.first(where: { $0 == mainDisplay }) {
+            return primary
+        }
+
+        return readableDisplays.first
     }
 
     /// Get the current brightness (0.0 to 1.0).
@@ -711,6 +842,11 @@ final class MediaKeyInterceptor {
 
     /// Set the brightness (0.0 to 1.0). Returns the actual brightness after setting.
     @discardableResult
+    /// Set the brightness (0.0 to 1.0).
+    ///
+    /// For Studio Display, do not immediately read the value back:
+    /// the hardware update can be asynchronous. A successful DisplayServices
+    /// setter call is enough; BrightnessMonitor will observe the real value later.
     private func setBrightness(_ brightness: Float, displayID: CGDirectDisplayID) -> Float? {
         guard let setBrightness = setBrightnessFunc else {
             return nil
@@ -720,10 +856,25 @@ final class MediaKeyInterceptor {
         let result = setBrightness(displayID, clampedBrightness)
 
         guard result == KERN_SUCCESS else {
+            logger.error("DisplayServicesSetBrightness failed with result \(result)")
             return nil
         }
 
-        return getCurrentBrightness(displayID: displayID)
+        // Mirror the standalone ds-up/ds-down test that works on Studio Display.
+        if let handle = dlopen(
+            "/System/Library/PrivateFrameworks/DisplayServices.framework/DisplayServices",
+            RTLD_NOW
+        ), let ptr = dlsym(handle, "DisplayServicesBrightnessChanged") {
+            let brightnessChanged = unsafeBitCast(
+                ptr,
+                to: (@convention(c) (CGDirectDisplayID, Double) -> Void).self
+            )
+            brightnessChanged(displayID, Double(clampedBrightness))
+            dlclose(handle)
+        }
+
+        // Return the requested value so adjustBrightness() keeps intercepting.
+        return clampedBrightness
     }
 
     /// Check if brightness can be changed on a display.
@@ -733,24 +884,17 @@ final class MediaKeyInterceptor {
         }
         return canChange(displayID)
     }
-
     /// Adjust brightness by delta and show HUD. Verifies the change worked.
     private func adjustBrightness(delta: Float) {
-        // Check if DisplayServices is available
+        // Check if DisplayServices is available.
         guard setBrightnessFunc != nil else {
             disableBrightnessInterception(reason: "DisplayServices not available")
             return
         }
 
-        // Get built-in display
-        guard let displayID = getBuiltinDisplayID() else {
-            disableBrightnessInterception(reason: "no built-in display found")
-            return
-        }
-
-        // Check if brightness can be changed
-        guard canChangeBrightness(displayID: displayID) else {
-            disableBrightnessInterception(reason: "display does not support brightness control")
+        // Get preferred DisplayServices-capable display.
+        guard let displayID = getBrightnessDisplayID() else {
+            disableBrightnessInterception(reason: "no DisplayServices-capable display found")
             return
         }
 
@@ -759,34 +903,34 @@ final class MediaKeyInterceptor {
             return
         }
 
-        // Calculate expected new brightness with quantization
+        // Calculate expected new brightness with quantization.
         let steps = 1.0 / abs(delta)
         var expectedBrightness = currentBrightness + delta
         expectedBrightness = round(expectedBrightness * steps) / steps
         expectedBrightness = max(0.0, min(1.0, expectedBrightness))
 
-        // Check if we're at a boundary
+        // Check if we're at a boundary.
         let atBoundary = (currentBrightness <= 0.001 && delta < 0) || (currentBrightness >= 0.999 && delta > 0)
 
-        // Set the brightness and get the actual result
+        // Set the brightness and get the requested result.
         guard let actualBrightness = setBrightness(expectedBrightness, displayID: displayID) else {
             disableBrightnessInterception(reason: "cannot set brightness")
             return
         }
 
-        // Verify the change worked (if not at a boundary)
+        // Verify the request (if not at a boundary).
         if !atBoundary {
             let brightnessChanged = abs(actualBrightness - currentBrightness) > 0.001
             if !brightnessChanged {
                 disableBrightnessInterception(reason: "brightness change did not take effect")
-                // Still show HUD with current state even though we're disabling
+                // Still show HUD with current state even though we're disabling.
             }
         }
 
-        // Quantize for display
+        // Quantize for display.
         let quantizedBrightness = round(actualBrightness * 16.0) / 16.0
 
-        // Show our HUD (only if brightness feature is enabled)
+        // Show our HUD (only if brightness feature is enabled).
         if brightnessHUDEnabled {
             hudController?.showBrightnessHUD(brightness: quantizedBrightness)
         }
