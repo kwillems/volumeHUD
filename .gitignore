@@ -54,3 +54,6 @@ buildServer.json
 releases/
 scripts/
 Secrets.swift
+
+# Local CLI build output
+build-cli/
