@@ -824,6 +824,49 @@ final class MediaKeyInterceptor {
         return readableDisplays.first
     }
 
+    /// Returns the display under the mouse when HUD Follows Mouse is enabled.
+    ///
+    /// Falls back to the existing preferred brightness display when the preference
+    /// is disabled or the mouse display cannot be used with DisplayServices.
+    private func getTargetBrightnessDisplayID() -> CGDirectDisplayID? {
+        let followMouse = UserDefaults.standard.bool(forKey: "volumeHUDFollowsMouse")
+
+        guard followMouse else {
+            return getBrightnessDisplayID()
+        }
+
+        let mouseLocation = NSEvent.mouseLocation
+
+        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) }),
+              let screenNumber = screen.deviceDescription[
+                  NSDeviceDescriptionKey("NSScreenNumber")
+              ] as? NSNumber
+        else {
+            logger.debug("Brightness target: mouse screen unavailable; using preferred display.")
+            return getBrightnessDisplayID()
+        }
+
+        let displayID = CGDirectDisplayID(screenNumber.uint32Value)
+
+        guard let getBrightness = getBrightnessFunc else {
+            return getBrightnessDisplayID()
+        }
+
+        var brightness: Float = 0.0
+        guard getBrightness(displayID, &brightness) == KERN_SUCCESS else {
+            logger.debug(
+                "Brightness target: mouse display \(displayID) is not readable through DisplayServices; using preferred display."
+            )
+            return getBrightnessDisplayID()
+        }
+
+        logger.debug(
+            "Brightness target follows mouse: displayID=\(displayID), screen=\(screen.localizedName)"
+        )
+
+        return displayID
+    }
+
     /// Get the current brightness (0.0 to 1.0).
     private func getCurrentBrightness(displayID: CGDirectDisplayID) -> Float? {
         guard let getBrightness = getBrightnessFunc else {
@@ -892,8 +935,10 @@ final class MediaKeyInterceptor {
             return
         }
 
-        // Get preferred DisplayServices-capable display.
-        guard let displayID = getBrightnessDisplayID() else {
+        // Select the brightness target. When HUD Follows Mouse is enabled,
+        // brightness follows the display under the mouse; otherwise preserve
+        // the existing preferred-display behaviour.
+        guard let displayID = getTargetBrightnessDisplayID() else {
             disableBrightnessInterception(reason: "no DisplayServices-capable display found")
             return
         }
