@@ -11,8 +11,6 @@ import SwiftUI
 // MARK: - AboutView
 
 struct AboutView: View {
-    @State private var isShowingBuildNumber: Bool = false
-
     // Settings for app preferences
     #if !SANDBOX
         @AppStorage("brightnessEnabled") private var brightnessEnabled: Bool = false
@@ -52,23 +50,7 @@ struct AboutView: View {
         return "3.0.0"
     }
 
-    /// Get the app build number
-    private var appBuildNumber: String {
-        if let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String {
-            return buildNumber
-        }
-        return "0"
-    }
-
-    private var aboutVersionLabelText: String {
-        if isShowingBuildNumber {
-            "Build \(appBuildNumber)"
-        } else {
-            "Version \(appVersion)"
-        }
-    }
-
-    // MARK: - About View
+// MARK: - About View
 
     var body: some View {
         HStack(alignment: .top, spacing: 20) {
@@ -82,34 +64,44 @@ struct AboutView: View {
                 }
                 Text("volumeHUD")
                     .font(.system(size: 24, weight: .medium))
-                Text("by Danny Stewart")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
 
-                Button {
-                    isShowingBuildNumber.toggle()
-                } label: {
-                    Text(aboutVersionLabelText)
+                VStack(spacing: 3) {
+                    Link(
+                        "Version 3.3.3+1",
+                        destination: URL(
+                            string: "https://github.com/kwillems/volumeHUD/releases/tag/v3.3.3-custom.1"
+                        )!
+                    )
+                    .font(.system(size: 11))
+                    .foregroundStyle(.blue)
+                    .underline()
+
+                    Text("by Koen Willems")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.plain)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .accessibilityLabel("Version information")
-                .accessibilityValue(aboutVersionLabelText)
-                .accessibilityHint("Activate to toggle between app version and build number")
 
-                #if !SANDBOX
-                    Button(action: openReleasesPage) {
-                        Text("Update available!")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.blue)
-                            .underline()
+                VStack(spacing: 3) {
+                    HStack(spacing: 0) {
+                        Text("Based on ")
+                            .foregroundStyle(.secondary)
+
+                        Link(
+                            "volumeHUD 3.3.3",
+                            destination: URL(
+                                string: "https://github.com/dannystewart/volumeHUD/releases/tag/v3.3.3"
+                            )!
+                        )
+                        .foregroundStyle(.blue)
+                        .underline()
                     }
-                    .buttonStyle(.plain)
-                    .disabled(!isUpdateAvailable)
-                    .opacity(isUpdateAvailable ? 1.0 : 0.0)
-                    .padding(.bottom, 16)
-                #endif // !SANDBOX
+
+                    Text("Original project by Danny Stewart")
+                        .foregroundStyle(.secondary)
+                }
+                .font(.system(size: 11))
+                .padding(.top, 8)
+
 
                 Spacer(minLength: 0)
 
@@ -170,11 +162,6 @@ struct AboutView: View {
                             Spacer()
                                 .frame(width: 14)
 
-                            Text("Experimental, built-in display only")
-                                .font(.system(size: 10))
-                                .foregroundStyle(.secondary)
-                                .opacity(0.8)
-                                .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
                     .padding(.leading, settingPadding)
@@ -220,8 +207,8 @@ struct AboutView: View {
 
                 Text(
                     trueToneController.isAvailable
-                        ? "Pas de kleurtemperatuur automatisch aan het omgevingslicht aan."
-                        : "True Tone is momenteel niet beschikbaar."
+                        ? "Automatically adjust the color temperature to ambient light."
+                        : "True Tone is currently unavailable."
                 )
                 .font(.system(size: 10))
                 .foregroundStyle(.secondary)
