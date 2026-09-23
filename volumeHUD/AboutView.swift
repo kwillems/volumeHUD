@@ -16,6 +16,7 @@ struct AboutView: View {
     #if !SANDBOX
         @AppStorage("brightnessEnabled") private var brightnessEnabled: Bool = false
     @StateObject private var trueToneController = TrueToneController()
+    @StateObject private var nightShiftController = NightShiftController()
     #endif // !SANDBOX
     @AppStorage("volumeHUDFollowsMouse") private var volumeHUDFollowsMouse: Bool = true
     @AppStorage("useRelativePositioning") private var useRelativePositioning: Bool = true
@@ -266,7 +267,61 @@ struct AboutView: View {
             Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
         ) { _ in
             trueToneController.refresh()
+            nightShiftController.refresh()
         }
+
+
+        // MARK: - Night Shift Toggle
+
+        VStack(alignment: .leading, spacing: spaceBeforeSubtitle) {
+            HStack(alignment: .center, spacing: iconColumnWidth) {
+                Image(systemName: "moon.fill")
+                    .foregroundStyle(
+                        nightShiftController.isEnabled && nightShiftController.isAvailable
+                            ? .orange
+                            : .gray
+                    )
+                    .font(.system(size: 14))
+                    .frame(width: 14, alignment: .leading)
+                    .animation(
+                        .easeInOut(duration: 0.3),
+                        value: nightShiftController.isEnabled
+                    )
+
+                Text("Night Shift")
+                    .font(.system(size: 12, weight: .medium))
+                    .frame(width: minSettingColumnWidth, alignment: .leading)
+
+                Spacer()
+
+                Toggle(
+                    "",
+                    isOn: Binding(
+                        get: { nightShiftController.isEnabled },
+                        set: { nightShiftController.setEnabled($0) }
+                    )
+                )
+                .toggleStyle(SwitchToggleStyle(tint: .accentColor))
+                .scaleEffect(0.8)
+                .disabled(!nightShiftController.isAvailable)
+            }
+
+            HStack(spacing: iconColumnWidth) {
+                Spacer()
+                    .frame(width: 14)
+
+                Text(
+                    nightShiftController.isAvailable
+                        ? "Reduce blue light with a warmer display."
+                        : "Night Shift is unavailable."
+                )
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+                .opacity(0.8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(.leading, settingPadding)
 
         #endif // !SANDBOX
 
@@ -351,7 +406,7 @@ struct AboutView: View {
             .padding(.trailing, 6) // Right side window padding
         }
         .padding(32) // Overall frame padding
-        .frame(width: 540, height: 390)
+        .frame(width: 540, height: 430)
         .onAppear {
             applyAppearance(appAppearance)
         }
