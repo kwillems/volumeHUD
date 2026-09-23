@@ -146,37 +146,6 @@ struct AboutView: View {
                     )
                 }
 
-                // MARK: - Appearance
-
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(alignment: .center, spacing: iconColumnWidth) {
-                        Image(systemName: "circle.righthalf.filled")
-                            .foregroundStyle(.secondary)
-                            .font(.system(size: 14))
-                            .frame(width: 14, alignment: .leading)
-
-                        Text("Appearance")
-                            .font(.system(size: 12, weight: .medium))
-                            .frame(width: minSettingColumnWidth, alignment: .leading)
-
-                        Spacer()
-                    }
-
-                    Picker("", selection: $appAppearance) {
-                        Text("System").tag("system")
-                        Text("Light").tag("light")
-                        Text("Dark").tag("dark")
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
-                    .frame(width: 220)
-                    .padding(.leading, 34)
-                    .onChange(of: appAppearance) { _, newValue in
-                        applyAppearance(newValue)
-                    }
-                }
-                .padding(.leading, settingPadding)
-
                 #if !SANDBOX
 
                     // MARK: - Brightness HUD Toggle
@@ -203,127 +172,11 @@ struct AboutView: View {
                                     appDelegate?.startBrightnessMonitoringIfEnabled()
                                 }
                         }
-
-                        HStack(spacing: iconColumnWidth) {
-                            Spacer()
-                                .frame(width: 14)
-
-                        }
                     }
                     .padding(.leading, settingPadding)
                     .animation(.easeInOut(duration: 0.3), value: brightnessEnabled)
-                
-        // MARK: - True Tone Toggle
-        VStack(alignment: .leading, spacing: spaceBeforeSubtitle) {
-            HStack(alignment: .center, spacing: iconColumnWidth) {
-                Image(systemName: "circle.lefthalf.filled")
-                    .foregroundStyle(
-                        trueToneController.isEnabled && trueToneController.isAvailable
-                            ? .primary
-                            : .secondary
-                    )
-                    .font(.system(size: 14))
-                    .frame(width: 14, alignment: .leading)
 
-                Text("True Tone")
-                    .font(.system(size: 12, weight: .medium))
-                    .frame(width: minSettingColumnWidth, alignment: .leading)
-
-                Spacer()
-
-                Toggle(
-                    "",
-                    isOn: Binding(
-                        get: { trueToneController.isEnabled },
-                        set: { newValue in
-                            _ = trueToneController.setEnabled(newValue)
-                        }
-                    )
-                )
-                .labelsHidden()
-                .toggleStyle(.switch)
-                .controlSize(.small)
-                .disabled(!trueToneController.isAvailable)
-                .offset(x: 12)
-            }
-
-            HStack(spacing: iconColumnWidth) {
-                Spacer()
-                    .frame(width: 14)
-
-                Text(
-                    trueToneController.isAvailable
-                        ? "Automatically adjust the color temperature to ambient light."
-                        : "True Tone is currently unavailable."
-                )
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
-                .opacity(0.8)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-        .padding(.leading, settingPadding)
-        .onReceive(
-            Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
-        ) { _ in
-            trueToneController.refresh()
-            nightShiftController.refresh()
-        }
-
-
-        // MARK: - Night Shift Toggle
-
-        VStack(alignment: .leading, spacing: spaceBeforeSubtitle) {
-            HStack(alignment: .center, spacing: iconColumnWidth) {
-                Image(systemName: "moon.fill")
-                    .foregroundStyle(
-                        nightShiftController.isEnabled && nightShiftController.isAvailable
-                            ? .orange
-                            : .gray
-                    )
-                    .font(.system(size: 14))
-                    .frame(width: 14, alignment: .leading)
-                    .animation(
-                        .easeInOut(duration: 0.3),
-                        value: nightShiftController.isEnabled
-                    )
-
-                Text("Night Shift")
-                    .font(.system(size: 12, weight: .medium))
-                    .frame(width: minSettingColumnWidth, alignment: .leading)
-
-                Spacer()
-
-                Toggle(
-                    "",
-                    isOn: Binding(
-                        get: { nightShiftController.isEnabled },
-                        set: { nightShiftController.setEnabled($0) }
-                    )
-                )
-                .toggleStyle(SwitchToggleStyle(tint: .accentColor))
-                .scaleEffect(0.8)
-                .disabled(!nightShiftController.isAvailable)
-            }
-
-            HStack(spacing: iconColumnWidth) {
-                Spacer()
-                    .frame(width: 14)
-
-                Text(
-                    nightShiftController.isAvailable
-                        ? "Reduce blue light with a warmer display."
-                        : "Night Shift is unavailable."
-                )
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
-                .opacity(0.8)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-        .padding(.leading, settingPadding)
-
-        #endif // !SANDBOX
+                #endif // !SANDBOX
 
                 // MARK: - Display Toggle for HUD Placement
 
@@ -400,6 +253,151 @@ struct AboutView: View {
                 }
                 .padding(.leading, settingPadding)
                 .animation(.easeInOut(duration: 0.3), value: useRelativePositioning)
+
+                #if !SANDBOX
+
+                    // MARK: - True Tone Toggle
+
+                    VStack(alignment: .leading, spacing: spaceBeforeSubtitle) {
+                        HStack(alignment: .center, spacing: iconColumnWidth) {
+                            Image(systemName: "circle.lefthalf.filled")
+                                .foregroundStyle(
+                                    trueToneController.isEnabled && trueToneController.isAvailable
+                                        ? .primary
+                                        : .secondary
+                                )
+                                .font(.system(size: 14))
+                                .frame(width: 14, alignment: .leading)
+
+                            Text("True Tone")
+                                .font(.system(size: 12, weight: .medium))
+                                .frame(width: minSettingColumnWidth, alignment: .leading)
+
+                            Spacer()
+
+                            Toggle(
+                                "",
+                                isOn: Binding(
+                                    get: { trueToneController.isEnabled },
+                                    set: { newValue in
+                                        _ = trueToneController.setEnabled(newValue)
+                                    }
+                                )
+                            )
+                            .labelsHidden()
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                            .disabled(!trueToneController.isAvailable)
+                            .offset(x: 12)
+                        }
+
+                        HStack(spacing: iconColumnWidth) {
+                            Spacer()
+                                .frame(width: 14)
+
+                            Text(
+                                trueToneController.isAvailable
+                                    ? "Automatically adjust the color temperature to ambient light."
+                                    : "True Tone is currently unavailable."
+                            )
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                            .opacity(0.8)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                    .padding(.leading, settingPadding)
+                    .onReceive(
+                        Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
+                    ) { _ in
+                        trueToneController.refresh()
+                        nightShiftController.refresh()
+                    }
+
+                    // MARK: - Night Shift Toggle
+
+                    VStack(alignment: .leading, spacing: spaceBeforeSubtitle) {
+                        HStack(alignment: .center, spacing: iconColumnWidth) {
+                            Image(systemName: "moon.fill")
+                                .foregroundStyle(
+                                    nightShiftController.isEnabled && nightShiftController.isAvailable
+                                        ? .orange
+                                        : .gray
+                                )
+                                .font(.system(size: 14))
+                                .frame(width: 14, alignment: .leading)
+                                .animation(
+                                    .easeInOut(duration: 0.3),
+                                    value: nightShiftController.isEnabled
+                                )
+
+                            Text("Night Shift")
+                                .font(.system(size: 12, weight: .medium))
+                                .frame(width: minSettingColumnWidth, alignment: .leading)
+
+                            Spacer()
+
+                            Toggle(
+                                "",
+                                isOn: Binding(
+                                    get: { nightShiftController.isEnabled },
+                                    set: { nightShiftController.setEnabled($0) }
+                                )
+                            )
+                            .toggleStyle(SwitchToggleStyle(tint: .accentColor))
+                            .scaleEffect(0.8)
+                            .disabled(!nightShiftController.isAvailable)
+                        }
+
+                        HStack(spacing: iconColumnWidth) {
+                            Spacer()
+                                .frame(width: 14)
+
+                            Text(
+                                nightShiftController.isAvailable
+                                    ? "Reduce blue light with a warmer display."
+                                    : "Night Shift is unavailable."
+                            )
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                            .opacity(0.8)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                    .padding(.leading, settingPadding)
+
+                #endif // !SANDBOX
+
+                // MARK: - Appearance
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .center, spacing: iconColumnWidth) {
+                        Image(systemName: "circle.righthalf.filled")
+                            .foregroundStyle(.secondary)
+                            .font(.system(size: 14))
+                            .frame(width: 14, alignment: .leading)
+
+                        Text("Appearance")
+                            .font(.system(size: 12, weight: .medium))
+                            .frame(width: minSettingColumnWidth, alignment: .leading)
+
+                        Spacer()
+                    }
+
+                    Picker("", selection: $appAppearance) {
+                        Text("System").tag("system")
+                        Text("Light").tag("light")
+                        Text("Dark").tag("dark")
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(width: 220)
+                    .padding(.leading, 34)
+                    .onChange(of: appAppearance) { _, newValue in
+                        applyAppearance(newValue)
+                    }
+                }
+                .padding(.leading, settingPadding)
 
                 Spacer(minLength: 0)
             }
