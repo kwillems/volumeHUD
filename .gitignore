@@ -57,3 +57,5 @@ Secrets.swift
 
 # Local CLI build output
 build-cli/
+resources/volumeHUD.icns
+*.app.zip
