@@ -354,6 +354,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, @preconcurrency UNUserNotifi
     // MARK: - Show About Window
 
     private func showAboutWindow() {
+        // Activate volumeHUD so the About window appears above other apps.
+        NSApp.activate(ignoringOtherApps: true)
         // If window already exists and is visible, just bring it to the front
         if let window = aboutWindow, window.isVisible {
             window.makeKeyAndOrderFront(nil)
