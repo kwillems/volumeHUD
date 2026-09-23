@@ -5,6 +5,7 @@
 //  https://github.com/dannystewart/volumeHUD
 //
 
+import AppKit
 import Combine
 import SwiftUI
 
@@ -18,6 +19,7 @@ struct AboutView: View {
     #endif // !SANDBOX
     @AppStorage("volumeHUDFollowsMouse") private var volumeHUDFollowsMouse: Bool = true
     @AppStorage("useRelativePositioning") private var useRelativePositioning: Bool = true
+    @AppStorage("appAppearance") private var appAppearance: String = "system"
 
     #if !SANDBOX
         /// State to track if an update is available
@@ -142,6 +144,37 @@ struct AboutView: View {
                         spaceBeforeSubtitle: spaceBeforeSubtitle,
                     )
                 }
+
+                // MARK: - Appearance
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .center, spacing: iconColumnWidth) {
+                        Image(systemName: "circle.righthalf.filled")
+                            .foregroundStyle(.secondary)
+                            .font(.system(size: 14))
+                            .frame(width: 14, alignment: .leading)
+
+                        Text("Appearance")
+                            .font(.system(size: 12, weight: .medium))
+                            .frame(width: minSettingColumnWidth, alignment: .leading)
+
+                        Spacer()
+                    }
+
+                    Picker("", selection: $appAppearance) {
+                        Text("System").tag("system")
+                        Text("Light").tag("light")
+                        Text("Dark").tag("dark")
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(width: 220)
+                    .padding(.leading, 34)
+                    .onChange(of: appAppearance) { _, newValue in
+                        applyAppearance(newValue)
+                    }
+                }
+                .padding(.leading, settingPadding)
 
                 #if !SANDBOX
 
@@ -318,7 +351,10 @@ struct AboutView: View {
             .padding(.trailing, 6) // Right side window padding
         }
         .padding(32) // Overall frame padding
-        .frame(width: 540, height: 350)
+        .frame(width: 540, height: 390)
+        .onAppear {
+            applyAppearance(appAppearance)
+        }
         #if !SANDBOX
             .onAppear {
             trueToneController.refresh()
@@ -328,6 +364,19 @@ struct AboutView: View {
                 }
             }
         #endif // !SANDBOX
+    }
+
+    // MARK: - Appearance
+
+    private func applyAppearance(_ value: String) {
+        switch value {
+        case "light":
+            NSApp.appearance = NSAppearance(named: .aqua)
+        case "dark":
+            NSApp.appearance = NSAppearance(named: .darkAqua)
+        default:
+            NSApp.appearance = nil
+        }
     }
 
     #if !SANDBOX
