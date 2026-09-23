@@ -4,6 +4,9 @@ set -euo pipefail
 ROOT="${1:-$(pwd)}"
 cd "$ROOT"
 
+APP_VERSION="3.3.3"
+BUILD_NUMBER="2"
+
 echo "== volumeHUD command-line build v4 =="
 echo "Source: $ROOT"
 echo
@@ -239,7 +242,7 @@ echo
   "${SOURCES[@]}" \
   -o "$MACOS/volumeHUD"
 
-cat > "$CONTENTS/Info.plist" <<'PLIST'
+cat > "$CONTENTS/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -262,9 +265,9 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>3.3.3-custom</string>
+  <string>$APP_VERSION</string>
   <key>CFBundleVersion</key>
-  <string>1</string>
+  <string>$BUILD_NUMBER</string>
   <key>LSUIElement</key>
   <true/>
   <key>NSPrincipalClass</key>

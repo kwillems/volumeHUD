@@ -42,12 +42,26 @@ struct AboutView: View {
     private let settingPadding: CGFloat = 24 // Higher for less padding
     private let spaceBeforeSubtitle: CGFloat = -3
 
-    /// Get the app version
+    /// App version, e.g. 3.3.3
     private var appVersion: String {
-        if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
-            return version
-        }
-        return "3.0.0"
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "3.3.3"
+    }
+
+    /// Build number, e.g. 2
+    private var buildNumber: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "0"
+    }
+
+    /// User-facing version, e.g. 3.3.3+2
+    private var displayVersion: String {
+        "\(appVersion)+\(buildNumber)"
+    }
+
+    /// GitHub release for this custom build
+    private var releaseURL: URL {
+        URL(
+            string: "https://github.com/kwillems/volumeHUD/releases/tag/v\(appVersion)-custom.\(buildNumber)"
+        )!
     }
 
 // MARK: - About View
@@ -67,10 +81,8 @@ struct AboutView: View {
 
                 VStack(spacing: 3) {
                     Link(
-                        "Version 3.3.3+1",
-                        destination: URL(
-                            string: "https://github.com/kwillems/volumeHUD/releases/tag/v3.3.3-custom.1"
-                        )!
+                        "Version \(displayVersion)",
+                        destination: releaseURL
                     )
                     .font(.system(size: 11))
                     .foregroundStyle(.blue)
