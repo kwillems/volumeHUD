@@ -1,77 +1,231 @@
-# volumeHUD
+# volumeHUD — Studio Display custom fork
 
-A simple macOS app that brings back the classic volume and brightness HUDs.
+A customized fork of [dannystewart/volumeHUD](https://github.com/dannystewart/volumeHUD), created to bring back the familiar classic macOS HUD and make it work more naturally with my own setup:
 
-**PLEASE NOTE: volumeHUD is feature-complete and no longer under active development.** This is an app I built for myself and it does everything it's supposed to. I'm very glad it's found an appreciative audience, but I am not accepting PRs and no further updates are planned except to fix bugs and maintain macOS compatibility.
+- **MacBook Pro**
+- **Apple Studio Display**
+- **Stream Deck**
+- **macOS Tahoe**
 
-## Why This Exists
+## Why this fork exists
 
-With macOS Tahoe, Apple revamped Control Center and replaced the classic volume and brightness indicators of 25 years with tiny popovers in the corner of the screen, even smaller than notifications. They're hard to see, especially against light backgrounds, and they disappear before I remember where to look. Even after months on the Tahoe beta I haven't gotten used to them. It's bad UI.
+With macOS Tahoe, Apple changed the traditional centered volume and brightness HUD into a much smaller indicator near the top-right of the screen.
 
-So I did what any sane person would do: I picked up Xcode and wrote my first ever Mac app to bring back the classic macOS HUDs we all know and love (except Apple, apparently). They do what any good system indicator should do: they show you the level when you change it and then they go away. And get this—you can actually *see them*. A groundbreaking feature in 2025.
+I preferred the old HUD. It is larger, immediately visible and much easier to read at a glance.
 
-## What It Looks Like
+That led me to [volumeHUD](https://github.com/dannystewart/volumeHUD), which restores the classic pre-Tahoe macOS HUD.
 
-<img src="Images/volumeHUD-demo.gif" alt="volumeHUD Demo" height="300"></img>
+The original project already solved the main problem, but my setup introduced a few additional requirements. I use a MacBook Pro connected to an Apple Studio Display, with a Stream Deck for volume and brightness control. I wanted the restored HUD to behave naturally in that configuration as well.
 
-## Usage
+This fork grew from that use case.
 
-Just launch the app! You should see a notification that it started, and you can begin enjoying your new (old) volume HUD right away. If you launch the app a second time, you'll get a window where you can set it to open at login, configure HUD preferences, and quit. It will also show when an update is available.
+## Interface
 
-<img src="Images/volumeHUD-settings.png" alt="volumeHUD Settings" height="300"></img>
+The fork adds a settings/About window for the additional HUD and display features.
 
-As of version 2.0, volumeHUD supports brightness. It is **off by default** (this is *volumeHUD*, after all), and it is **experimental and unsupported**. It will only work for built-in displays, and it may not be bulletproof for automatic changes like power source or ambient light, though it does mostly catch these.
+<table>
+  <tr>
+    <td align="center">
+      <img src="images/settings_light.png" width="500"><br>
+      <sub>Light appearance</sub>
+    </td>
+    <td align="center">
+      <img src="images/settings_dark.png" width="500"><br>
+      <sub>Dark appearance</sub>
+    </td>
+  </tr>
+</table>
 
-As of version 3.0, **volumeHUD hides the system HUD**. It does this by intercepting the volume/brightness keys and handling volume/brightness changes directly, instead of having the OS do it. There is a safety check to make sure the volume/brightness has actually changed after you press a key; if not, the app assumes key interception is not working and disables it until a device change or the app is restarted. This ensures you can still change volume or brightness even if this doesn't work on your system.
+## Based on volumeHUD
 
-## Installation
+The original volumeHUD restores the classic macOS HUD for media-key actions such as volume, mute and display brightness.
 
-You can download it from the repo, but I strongly recommend installing via Homebrew, as that will handle updates for you. It's my first Swift app, so I don't want you to be left with any lingering bugs.
+This fork keeps that core behaviour and adds several features aimed primarily at using a MacBook Pro together with an Apple Studio Display.
+
+## Added in this fork
+
+### Apple Studio Display brightness control
+
+One of the main additions in this fork is direct brightness control for an attached **Apple Studio Display**.
+
+The fork uses Apple's `DisplayServices` framework for brightness control, allowing brightness changes to be applied to the Studio Display while still using the restored classic HUD.
+
+This was one of the main reasons for creating the fork.
+
+### Brightness HUD
+
+The restored classic HUD can also be used for brightness changes.
+
+The **Brightness HUD** option can be enabled or disabled independently in the application window.
+
+### Stream Deck support
+
+The fork is designed to work with the standard Stream Deck media controls.
+
+In my setup I use the built-in actions under:
+
+**System → Multimedia**
+
+including:
+
+- Increase Screen Brightness
+- Decrease Screen Brightness
+- Volume Up
+- Volume Down
+- Mute
+
+No custom Stream Deck plugin is required.
+
+The Stream Deck generates the normal macOS media-key events and volumeHUD handles them, including routing brightness changes to the Studio Display.
+
+### HUD Follows Mouse
+
+When **HUD Follows Mouse** is enabled, brightness control and the brightness HUD follow the display containing the mouse pointer.
+
+For example, with both the MacBook display and Studio Display active:
+
+- move the pointer to the Studio Display and adjust brightness → the Studio Display is adjusted
+- move the pointer to the MacBook display and adjust brightness → the MacBook display is adjusted
+
+Volume and mute remain associated with the normal macOS audio output device.
+
+### Relative HUD Position
+
+The original classic HUD has a fixed visual style, but its exact vertical position may not be ideal on every display.
+
+The **Relative HUD Position** option places the HUD using a relative percentage from the bottom of the screen.
+
+This makes the HUD position scale more naturally between displays with different sizes and resolutions.
+
+### True Tone
+
+True Tone can be controlled directly from volumeHUD.
+
+This makes it possible to enable or disable True Tone without opening System Settings.
+
+### Night Shift
+
+Night Shift control is also available from the volumeHUD window.
+
+This provides quick access to the warmer display mode from the same place as the other display-related settings.
+
+### Appearance
+
+The application window can use:
+
+- **System**
+- **Light**
+- **Dark**
+
+The selected appearance applies to the volumeHUD interface independently of the current macOS appearance when desired.
+
+### Open at Login
+
+**Open at Login** can be enabled directly from the application.
+
+This allows volumeHUD to start automatically after signing in to macOS.
+
+### Custom menu bar icon
+
+This fork uses a custom menu bar icon that combines the two main functions of the application:
+
+- audio
+- display control
+
+The icon visually matches the role the application now has in this fork.
+
+### Settings and About window
+
+This fork adds a combined settings and About window containing:
+
+- version information
+- credit to the original volumeHUD project
+- Open at Login
+- Brightness HUD
+- HUD Follows Mouse
+- Relative HUD Position
+- True Tone
+- Night Shift
+- appearance controls
+- a Quit button
+
+## Behaviour overview
+
+| Action | Behaviour |
+|---|---|
+| Volume Up / Down | Controls the current macOS audio output |
+| Mute | Controls the current macOS audio output |
+| Brightness Up / Down | Controls display brightness |
+| Brightness HUD | Shows the classic-style brightness HUD |
+| HUD Follows Mouse | Shows the HUD on the display containing the pointer |
+| Relative HUD Position | Positions the HUD using a relative percentage from the bottom |
+| Stream Deck media controls | Uses the standard Stream Deck multimedia actions |
+| True Tone | Can be toggled from volumeHUD |
+| Night Shift | Can be toggled from volumeHUD |
+| Appearance | System, Light or Dark |
+| Open at Login | Starts volumeHUD automatically after login |
+
+## My setup
+
+This fork is primarily developed and tested with:
+
+- a **MacBook Pro**
+- an **Apple Studio Display**
+- a **Stream Deck**
+- **macOS Tahoe**
+
+The additional functionality was created for this configuration first.
+
+Other display setups may work as well, but they are not the primary focus of the fork.
+
+## Building
+
+The project can be built from the command line with:
 
 ```bash
-brew install dannystewart/apps/volumehud
+tools/build_volumehud_cli.sh
 ```
 
-You can uninstall with `brew uninstall volumehud`, which should remove all traces of the app, including preferences and login item. No permissions should be left behind either once the app is gone.
+The build script is located in the `tools` directory.
 
-## Permissions
+No Homebrew installation is required for this build method.
 
-I worked hard to ensure the app could function without requiring any permissions. It will request two that are **optional but recommended**.
+## Project structure
 
-- **Notifications** are used only to confirm the app has started (and only when launched manually, not as a login item). Feel free to disable if you find them unnecessary.
-- **Accessibility** is needed for full functionality. The app will work without it, but you lose some features:
-  - The system HUD will still appear alongside volumeHUD.
-  - The HUD won't appear if you go below 0% or above 100% since it can't use key presses to determine if levels should have changed.
-  - Brightness checks may be less reliable since key timing can't be used to check whether a change is user-initiated.
+Some of the areas changed or added in this fork include the code responsible for:
 
-Apart from that, all other features should work.
+- brightness monitoring and control
+- media-key interception
+- HUD placement
+- multi-display behaviour
+- True Tone
+- Night Shift
+- login-item support
+- appearance settings
+- the About/settings window
+- the custom menu bar icon
+- command-line building
 
-## Troubleshooting
+## Design goal
 
-If you're experiencing inconsistent behavior, the most likely cause is lack of Accessibility permissions, and the first thing I would recommend is a full reset. The most thorough way to do this is to uninstall and reinstall:
+This fork is intentionally focused.
 
-1. Completely quit volumeHUD by opening it a second time and clicking **Quit volumeHUD** or by running `pkill -f volumeHUD`
-2. Open **System Settings** → **Privacy & Security** → **Accessibility**.
-3. Find **volumeHUD** in the list, select it, and click the minus (-) button at the bottom. Make sure it's removed from the list.
-4. Assuming you installed with Homebrew, run `brew uninstall volumehud` to remove the login item, the app, and any remaining files.
-5. Run `brew install dannystewart/apps/volumehud` to reinstall.
-6. Reopen **volumeHUD.app**. You should be prompted with "this application has been downloaded from the internet" first, followed by a request for Accessibility permissions.
-7. Open **System Settings** like it says to do, make sure **volumeHUD** is in the list now, and toggle it on. If it says you'll need to quit and reopen, do that and try again.
+It is **not** intended to become a full display-management utility.
 
-Alternatively, you can do the same reset from the command line:
+The goal is simply to bring back the familiar macOS HUD and make it work naturally with a MacBook Pro, Apple Studio Display and Stream Deck, while adding a small set of practical display controls around it.
 
-```bash
-pkill -f volumeHUD
-tccutil reset Accessibility com.dannystewart.volumehud
-tccutil reset ListenEvent com.dannystewart.volumehud
-brew uninstall volumehud
-brew install dannystewart/apps/volumehud
-```
+## Upstream project
 
-Then run the app again, grant the requested permissions, and triple-check everything in **System Settings**.
+This project is based on:
+
+[dannystewart/volumeHUD](https://github.com/dannystewart/volumeHUD)
+
+The original project by Danny Stewart provides the core volumeHUD implementation and deserves the credit for restoring the classic pre-Tahoe macOS HUD.
+
+This fork adds functionality primarily aimed at my own Apple Studio Display and Stream Deck setup.
 
 ## License
 
-This project is open source under the [MIT License](./LICENSE). You're free to do what you want with it, but credit would be appreciated.
+This fork follows the license of the original volumeHUD project.
 
-<a href="https://www.buymeacoffee.com/dannystewart" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-blue.png" alt="Buy Me A Coffee" height="41" width="174"></a>
+See the included `LICENSE` file for details.
