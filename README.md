@@ -35,21 +35,20 @@ This fork extends volumeHUD so that:
 
 The application provides a macOS-style HUD for both volume and display brightness.
 
-### Volume HUD
-
-<p align="center">
-  <img src="images/volume-hud.png" alt="Volume HUD" width="25%">
-</p>
-
-The Volume HUD appears when changing the system volume or when muting or unmuting the audio output.
-
-### Brightness HUD
-
-<p align="center">
-  <img src="images/brightness-hud.png" alt="Brightness HUD" width="25%">
-</p>
-
-The Brightness HUD appears when changing the brightness of a supported display, such as an Apple Studio Display.
+<table>
+  <tr>
+    <td align="center" valign="top" width="50%">
+      <img src="images/volume-hud.png" alt="Volume HUD" width="40%"><br><br>
+      <strong>Volume HUD</strong><br>
+      The Volume HUD appears when changing the system volume or when muting or unmuting the audio output.
+    </td>
+    <td align="center" valign="top" width="50%">
+      <img src="images/brightness-hud.png" alt="Brightness HUD" width="40%"><br><br>
+      <strong>Brightness HUD</strong><br>
+      The Brightness HUD appears when changing the brightness of a supported display, such as an Apple Studio Display.
+    </td>
+  </tr>
+</table>
 
 ## Added in this fork
 
