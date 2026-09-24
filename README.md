@@ -1,4 +1,12 @@
-# volumeHUD — Studio Display Custom Fork
+<p align="center">
+  <img src="resources/volumeHUD.png" alt="volumeHUD icon" width="128">
+</p>
+
+<h1 align="center">volumeHUD — Studio Display Custom Fork</h1>
+
+<p align="center">
+  A custom fork of volumeHUD for Apple Studio Display volume and brightness HUD support.
+</p>
 
 This is a custom fork of [volumeHUD](https://github.com/dannystewart/volumeHUD), based on version 3.3.3.
 
@@ -123,6 +131,8 @@ volumeHUD/
 │   ├── settings_dark.png
 │   ├── settings_light.png
 │   └── volume-hud.png
+├── resources/
+│   └── volumeHUD.png
 ├── tools/
 │   └── build_volumehud_cli.sh
 └── ...
