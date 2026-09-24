@@ -38,7 +38,7 @@ The application provides a macOS-style HUD for both volume and display brightnes
 ### Volume HUD
 
 <p align="center">
-  <img src="images/volume-hud.png" alt="Volume HUD" width="50%">
+  <img src="images/volume-hud.png" alt="Volume HUD" width="25%">
 </p>
 
 The Volume HUD appears when changing the system volume or when muting or unmuting the audio output.
@@ -46,7 +46,7 @@ The Volume HUD appears when changing the system volume or when muting or unmutin
 ### Brightness HUD
 
 <p align="center">
-  <img src="images/brightness-hud.png" alt="Brightness HUD" width="50%">
+  <img src="images/brightness-hud.png" alt="Brightness HUD" width="25%">
 </p>
 
 The Brightness HUD appears when changing the brightness of a supported display, such as an Apple Studio Display.
