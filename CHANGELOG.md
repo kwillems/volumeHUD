@@ -6,6 +6,73 @@ The format is based on [Keep a Changelog], and this project adheres to [Semantic
 
 ## [Unreleased]
 
+## [3.3.3-custom.5] (2026-09-25)
+
+### Changed
+
+- Reduces idle resource usage by stopping continuous polling of True Tone and Night Shift while their settings are not being displayed.
+- Caches brightness display selection to avoid repeatedly discovering the target display during brightness changes.
+- Reduces idle brightness polling and avoids unnecessary brightness readback work.
+- Replaces periodic audio output device polling with CoreAudio default-device change listeners.
+- Caches display selection in the brightness media-key interceptor to avoid repeated display lookups.
+
+## [3.3.3-custom.4] (2026-09-24)
+
+### Added
+
+- Adds update status information to the About window.
+
+### Changed
+
+- Expands the README with information about the Studio Display custom fork and its additional features.
+- Adds volume and brightness HUD screenshots to the README.
+- Improves README formatting and reduces the displayed size of HUD screenshots.
+
+## [3.3.3-custom.3] (2026-09-24)
+
+### Added
+
+- Adds a custom menu bar icon.
+- Adds a redesigned application icon.
+- Adds an appearance selector with System, Light and Dark modes.
+- Adds Night Shift controls for supported displays.
+
+### Changed
+
+- Reorders settings in the About window.
+- Brings the About window to the foreground when opened.
+
+## [3.3.3-custom.2] (2026-09-23)
+
+### Added
+
+- Adds a custom application icon.
+
+### Changed
+
+- Updates the About window.
+- Cleans up the command-line build tooling and version handling.
+
+### Fixed
+
+- Fixes application signing so macOS login item registration works correctly with custom command-line builds.
+
+## [3.3.3-custom.1] (2026-09-22)
+
+### Added
+
+- Adds Apple Studio Display brightness support.
+- Adds brightness control through macOS brightness media-key events, including compatible Stream Deck System → Multimedia brightness actions.
+- Adds a brightness HUD for supported external displays.
+- Adds support for selecting the brightness target display based on the mouse position.
+- Extends HUD Follows Mouse behavior to brightness display selection.
+- Adds True Tone control for supported displays.
+- Adds command-line build support for the custom volumeHUD fork.
+
+### Changed
+
+- Extends volumeHUD's brightness handling beyond the built-in Mac display to support the Apple Studio Display.
+
 ## [3.3.3] (2026-08-23)
 
 ### Fixed
@@ -285,7 +352,13 @@ Initial release.
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
 
 <!-- Versions -->
-[unreleased]: https://github.com/dannystewart/volumeHUD/compare/v3.3.2...HEAD
+[unreleased]: https://github.com/dannystewart/volumeHUD/compare/v3.3.3-custom.5...HEAD
+[3.3.3-custom.5]: https://github.com/dannystewart/volumeHUD/compare/v3.3.3-custom.4...v3.3.3-custom.5
+[3.3.3-custom.4]: https://github.com/dannystewart/volumeHUD/compare/v3.3.3-custom.3...v3.3.3-custom.4
+[3.3.3-custom.3]: https://github.com/dannystewart/volumeHUD/compare/v3.3.3-custom.2...v3.3.3-custom.3
+[3.3.3-custom.2]: https://github.com/dannystewart/volumeHUD/compare/v3.3.3-custom.1...v3.3.3-custom.2
+[3.3.3-custom.1]: https://github.com/dannystewart/volumeHUD/compare/v3.3.3...v3.3.3-custom.1
+[3.3.3]: https://github.com/dannystewart/volumeHUD/compare/v3.3.2...v3.3.3
 [3.3.2]: https://github.com/dannystewart/volumeHUD/compare/v3.3.1...v3.3.2
 [3.3.1]: https://github.com/dannystewart/volumeHUD/compare/v3.3.0...v3.3.1
 [3.3.0]: https://github.com/dannystewart/volumeHUD/compare/v3.2.0...v3.3.0
