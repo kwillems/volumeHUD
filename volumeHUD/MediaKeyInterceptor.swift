@@ -182,6 +182,7 @@ final class MediaKeyInterceptor {
     private var canChangeBrightnessFunc: (@convention(c) (CGDirectDisplayID) -> Bool)?
     private var getBrightnessFunc: (@convention(c) (CGDirectDisplayID, UnsafeMutablePointer<Float>) -> kern_return_t)?
     private var setBrightnessFunc: (@convention(c) (CGDirectDisplayID, Float) -> kern_return_t)?
+    private var cachedBrightnessDisplayID: CGDirectDisplayID?
 
     /// Whether brightness HUD feature is enabled in settings
     private var brightnessHUDEnabled: Bool {
@@ -770,6 +771,10 @@ final class MediaKeyInterceptor {
     /// Do not rely on DisplayServicesCanChangeBrightness for external Apple displays.
     /// Some Studio Display/macOS combinations can still be read/written correctly.
     private func getBrightnessDisplayID() -> CGDirectDisplayID? {
+        if let cachedBrightnessDisplayID {
+            return cachedBrightnessDisplayID
+        }
+
         guard let getBrightness = getBrightnessFunc else {
             return nil
         }
@@ -799,6 +804,7 @@ final class MediaKeyInterceptor {
         if let appleExternal = readableDisplays.first(where: {
             CGDisplayIsBuiltin($0) == 0 && CGDisplayVendorNumber($0) == 0x0610
         }) {
+            cachedBrightnessDisplayID = appleExternal
             return appleExternal
         }
 
@@ -806,6 +812,7 @@ final class MediaKeyInterceptor {
         if let primaryExternal = readableDisplays.first(where: {
             $0 == mainDisplay && CGDisplayIsBuiltin($0) == 0
         }) {
+            cachedBrightnessDisplayID = primaryExternal
             return primaryExternal
         }
 
@@ -813,15 +820,22 @@ final class MediaKeyInterceptor {
         if let external = readableDisplays.first(where: {
             CGDisplayIsBuiltin($0) == 0
         }) {
+            cachedBrightnessDisplayID = external
             return external
         }
 
         // Finally preserve built-in behaviour.
         if let primary = readableDisplays.first(where: { $0 == mainDisplay }) {
+            cachedBrightnessDisplayID = primary
             return primary
         }
 
-        return readableDisplays.first
+        if let firstReadable = readableDisplays.first {
+            cachedBrightnessDisplayID = firstReadable
+            return firstReadable
+        }
+
+        return nil
     }
 
     /// Returns the display under the mouse when HUD Follows Mouse is enabled.
@@ -944,6 +958,7 @@ final class MediaKeyInterceptor {
         }
 
         guard let currentBrightness = getCurrentBrightness(displayID: displayID) else {
+            cachedBrightnessDisplayID = nil
             disableBrightnessInterception(reason: "cannot read brightness")
             return
         }
@@ -959,6 +974,7 @@ final class MediaKeyInterceptor {
 
         // Set the brightness and get the requested result.
         guard let actualBrightness = setBrightness(expectedBrightness, displayID: displayID) else {
+            cachedBrightnessDisplayID = nil
             disableBrightnessInterception(reason: "cannot set brightness")
             return
         }
@@ -1195,6 +1211,7 @@ final class MediaKeyInterceptor {
     /// Handle display configuration changes.
     @objc
     private func displayConfigurationDidChange(_: Notification) {
+        cachedBrightnessDisplayID = nil
         logger.info("MediaKeyInterceptor: Display configuration change detected.")
 
         // Reset brightness interception state to re-test with new display configuration
