@@ -5,7 +5,7 @@ ROOT="${1:-$(pwd)}"
 cd "$ROOT"
 
 APP_VERSION="3.3.3"
-BUILD_NUMBER="4"
+BUILD_NUMBER="5"
 
 echo "== volumeHUD command-line build v4 =="
 echo "Source: $ROOT"
