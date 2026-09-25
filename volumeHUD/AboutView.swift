@@ -510,17 +510,7 @@ struct AboutView: View {
 
                     .padding(.leading, settingPadding)
 
-                    .onReceive(
-
-                        Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
-
-                    ) { _ in
-
-                        trueToneController.refresh()
-
-                        nightShiftController.refresh()
-
-                    }
+                    
 
 // MARK: - Night Shift Toggle
 
@@ -689,6 +679,7 @@ struct AboutView: View {
             .onAppear {
 
             trueToneController.refresh()
+                nightShiftController.refresh()
 
                 Task {
 
