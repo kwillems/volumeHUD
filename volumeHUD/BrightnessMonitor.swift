@@ -37,6 +37,7 @@ class BrightnessMonitor: ObservableObject, @unchecked Sendable {
     private let isPreviewMode: Bool
     private var isObservingDisplayChanges = false
     private var restartTask: Task<Void, Never>?
+    private var cachedBrightnessDisplayID: CGDirectDisplayID?
 
     /// Cache DisplayServices function pointers
     private var displayServicesHandle: UnsafeMutableRawPointer?
@@ -189,6 +190,12 @@ class BrightnessMonitor: ObservableObject, @unchecked Sendable {
     /// Do not rely on DisplayServicesCanChangeBrightness for external Apple displays.
     /// Some Studio Display/macOS combinations can still be read/written correctly.
     private func getBrightnessDisplayID() -> CGDirectDisplayID? {
+        // The display configuration normally changes very rarely, so avoid
+        // rediscovering the preferred brightness display on every polling tick.
+        if let cachedBrightnessDisplayID {
+            return cachedBrightnessDisplayID
+        }
+
         guard let getBrightness = getBrightnessFunc else {
             return nil
         }
@@ -213,34 +220,38 @@ class BrightnessMonitor: ObservableObject, @unchecked Sendable {
         let readableDisplays = displays.filter(canReadBrightness)
         let mainDisplay = CGMainDisplayID()
 
-        // First choice: external Apple display (Studio Display / Pro Display XDR).
-        // Apple's display vendor ID is 0x0610.
         if let appleExternal = readableDisplays.first(where: {
             CGDisplayIsBuiltin($0) == 0 && CGDisplayVendorNumber($0) == 0x0610
         }) {
+            cachedBrightnessDisplayID = appleExternal
             return appleExternal
         }
 
-        // Next: readable external main display.
         if let primaryExternal = readableDisplays.first(where: {
             $0 == mainDisplay && CGDisplayIsBuiltin($0) == 0
         }) {
+            cachedBrightnessDisplayID = primaryExternal
             return primaryExternal
         }
 
-        // Then any readable external display.
         if let external = readableDisplays.first(where: {
             CGDisplayIsBuiltin($0) == 0
         }) {
+            cachedBrightnessDisplayID = external
             return external
         }
 
-        // Finally preserve built-in behaviour.
         if let primary = readableDisplays.first(where: { $0 == mainDisplay }) {
+            cachedBrightnessDisplayID = primary
             return primary
         }
 
-        return readableDisplays.first
+        if let first = readableDisplays.first {
+            cachedBrightnessDisplayID = first
+            return first
+        }
+
+        return nil
     }
 
     private func updateBrightnessOnStartup() {
@@ -280,6 +291,7 @@ class BrightnessMonitor: ObservableObject, @unchecked Sendable {
             return brightness
         }
 
+        cachedBrightnessDisplayID = nil
         logger.error("getCurrentBrightness: getBrightness failed with result \(result)")
         return nil
     }
@@ -505,6 +517,8 @@ class BrightnessMonitor: ObservableObject, @unchecked Sendable {
 
     @objc
     private func displayConfigurationDidChange(_: Notification) {
+        cachedBrightnessDisplayID = nil
+
         // Cancel any pending restart task to debounce rapid-fire display config changes
         restartTask?.cancel()
 
