@@ -52,7 +52,7 @@ class VolumeMonitor: ObservableObject, @unchecked Sendable {
     #endif // !SANDBOX
     private var volumeListenerBlock: ((UInt32, UnsafePointer<AudioObjectPropertyAddress>) -> Void)?
     private var muteListenerBlock: ((UInt32, UnsafePointer<AudioObjectPropertyAddress>) -> Void)?
-    private var devicePollingTimer: Timer?
+    private var defaultDeviceListenerBlock: AudioObjectPropertyListenerBlock?
     private let isPreviewMode: Bool
     private var isOptionShiftHeld: Bool = false
 
@@ -629,17 +629,55 @@ class VolumeMonitor: ObservableObject, @unchecked Sendable {
     // MARK: Device Change Monitoring
 
     private func startDefaultDeviceMonitoring() {
-        devicePollingTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain,
+        )
+
+        let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
             Task { @MainActor [weak self] in
                 self?.checkForDeviceChange()
             }
         }
-        logger.debug("Polling for changes to the default output device.")
+
+        let status = AudioObjectAddPropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address,
+            DispatchQueue.main,
+            listener,
+        )
+
+        if status == noErr {
+            defaultDeviceListenerBlock = listener
+            logger.debug("Listening for changes to the default output device.")
+        } else {
+            logger.error("Failed to register default output device listener: \(status)")
+        }
     }
 
     private func stopDefaultDeviceMonitoring() {
-        devicePollingTimer?.invalidate()
-        devicePollingTimer = nil
+        if let listener = defaultDeviceListenerBlock {
+            var address = AudioObjectPropertyAddress(
+                mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+                mScope: kAudioObjectPropertyScopeGlobal,
+                mElement: kAudioObjectPropertyElementMain,
+            )
+
+            let status = AudioObjectRemovePropertyListenerBlock(
+                AudioObjectID(kAudioObjectSystemObject),
+                &address,
+                DispatchQueue.main,
+                listener,
+            )
+
+            if status != noErr {
+                logger.warning("Failed to remove default output device listener: \(status)")
+            }
+
+            defaultDeviceListenerBlock = nil
+        }
+
         logger.debug("Stopped device monitoring.")
     }
 
