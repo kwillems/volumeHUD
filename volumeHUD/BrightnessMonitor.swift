@@ -37,6 +37,7 @@ class BrightnessMonitor: ObservableObject, @unchecked Sendable {
     private let isPreviewMode: Bool
     private var isObservingDisplayChanges = false
     private var restartTask: Task<Void, Never>?
+    private var fastBrightnessPollingTask: Task<Void, Never>?
     private var cachedBrightnessDisplayID: CGDirectDisplayID?
 
     /// Cache DisplayServices function pointers
@@ -113,6 +114,8 @@ class BrightnessMonitor: ObservableObject, @unchecked Sendable {
 
         // Stop polling
         stopBrightnessPolling()
+        fastBrightnessPollingTask?.cancel()
+        fastBrightnessPollingTask = nil
 
         // Stop system event monitoring
         stopSystemEventMonitoring()
@@ -296,20 +299,42 @@ class BrightnessMonitor: ObservableObject, @unchecked Sendable {
         return nil
     }
 
-    private func startBrightnessPolling() {
-        // Poll more frequently than volume since brightness changes are more granular
-        brightnessPollingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+    private func startBrightnessPolling(interval: TimeInterval = 1.0) {
+        brightnessPollingTimer?.invalidate()
+
+        brightnessPollingTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.checkForBrightnessChange()
             }
         }
-        logger.debug("Started polling for brightness changes.")
+
+        logger.debug("Started brightness polling at \(interval)s interval.")
     }
 
     private func stopBrightnessPolling() {
         brightnessPollingTimer?.invalidate()
         brightnessPollingTimer = nil
         logger.debug("Stopped brightness polling.")
+    }
+
+    @MainActor
+    private func beginFastBrightnessPolling() {
+        // A brightness key event is a strong signal that more changes may follow,
+        // for example while a key is held down. Poll quickly for a short period,
+        // then return to the low-cost idle interval.
+        startBrightnessPolling(interval: 0.1)
+
+        fastBrightnessPollingTask?.cancel()
+        fastBrightnessPollingTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(nanoseconds: 1_000_000_000)
+                guard let self else { return }
+                self.startBrightnessPolling(interval: 1.0)
+                self.fastBrightnessPollingTask = nil
+            } catch {
+                // A newer brightness event restarted the fast-polling window.
+            }
+        }
     }
 
     private func startSystemEventMonitoring() {
@@ -626,8 +651,9 @@ class BrightnessMonitor: ObservableObject, @unchecked Sendable {
                 logger.debug("Brightness key detected: keyCode=\(keyCode) (\(keyCode == 2 ? "up" : "down"))")
                 // Track when a brightness key was pressed
                 lastBrightnessKeyTime = now
+                beginFastBrightnessPolling()
                 showHUDForBrightnessKeyPress()
-                // Trigger an immediate state check to avoid waiting for the 0.1s polling tick
+                // Trigger an immediate state check instead of waiting for the polling timer.
                 checkForBrightnessChange()
 
             default:
