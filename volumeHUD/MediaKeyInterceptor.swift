@@ -161,8 +161,8 @@ final class MediaKeyInterceptor {
     /// Last logical target and its physical read-back, which may differ on hardware-quantized devices
     private var volumeControlState: VolumeControlState?
 
-    /// Timer for polling audio device changes
-    private var audioDevicePollingTimer: Timer?
+    /// CoreAudio listener for changes to the default output device.
+    private var audioDeviceListenerBlock: AudioObjectPropertyListenerBlock?
 
     /// Whether we're observing display configuration changes
     private var isObservingDisplayChanges = false
@@ -1096,11 +1096,33 @@ final class MediaKeyInterceptor {
         // Record initial audio device
         lastKnownAudioDeviceID = getDefaultOutputDevice() ?? kAudioObjectUnknown
 
-        // Poll for audio device changes
-        audioDevicePollingTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+        // Listen for actual changes to the default output device instead of polling.
+        var audioDeviceAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain,
+        )
+
+        let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
             Task { @MainActor [weak self] in
                 self?.checkForAudioDeviceChange()
             }
+        }
+
+        let listenerStatus = AudioObjectAddPropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject),
+            &audioDeviceAddress,
+            DispatchQueue.main,
+            listener,
+        )
+
+        if listenerStatus == noErr {
+            audioDeviceListenerBlock = listener
+            logger.debug("Listening for default audio output device changes.")
+        } else {
+            logger.warning(
+                "Failed to register default audio output device listener: \(listenerStatus)"
+            )
         }
 
         // Observe display configuration changes
@@ -1118,8 +1140,28 @@ final class MediaKeyInterceptor {
 
     /// Stop monitoring for device changes.
     private func stopDeviceChangeMonitoring() {
-        audioDevicePollingTimer?.invalidate()
-        audioDevicePollingTimer = nil
+        if let listener = audioDeviceListenerBlock {
+            var audioDeviceAddress = AudioObjectPropertyAddress(
+                mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+                mScope: kAudioObjectPropertyScopeGlobal,
+                mElement: kAudioObjectPropertyElementMain,
+            )
+
+            let status = AudioObjectRemovePropertyListenerBlock(
+                AudioObjectID(kAudioObjectSystemObject),
+                &audioDeviceAddress,
+                DispatchQueue.main,
+                listener,
+            )
+
+            if status != noErr {
+                logger.warning(
+                    "Failed to remove default audio output device listener: \(status)"
+                )
+            }
+
+            audioDeviceListenerBlock = nil
+        }
 
         if isObservingDisplayChanges {
             NotificationCenter.default.removeObserver(
